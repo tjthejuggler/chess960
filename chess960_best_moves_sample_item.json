@@ -1,0 +1,29 @@
+{
+    "959": {
+    "position_number": 959,
+    "fen": "rkrnnqbb/pppppppp/8/8/8/8/PPPPPPPP/RKRNNQBB w KQkq - 0 1",
+    "top_moves": [
+      {
+        "move": "g2g4",
+        "move_san": "g4",
+        "score_cp": 15,
+        "score_raw": "PovScore(Cp(+15), WHITE)"
+      },
+      {
+        "move": "f2f4",
+        "move_san": "f4",
+        "score_cp": 5,
+        "score_raw": "PovScore(Cp(+5), WHITE)"
+      },
+      {
+        "move": "e1d3",
+        "move_san": "Nd3",
+        "score_cp": 3,
+        "score_raw": "PovScore(Cp(+3), WHITE)"
+      }
+    ],
+    "best_move": "g2g4",
+    "best_move_san": "g4",
+    "best_score": 15
+  }
+}

@@ -466,16 +466,43 @@
                     document.getElementById('tooltip').classList.remove('show');
                 });
 
+            // Define piece colors
+            const pieceColors = {
+                'King': '#FFD700',      // Gold
+                'Queen': '#FF1493',     // Deep Pink
+                'Rook': '#4169E1',      // Royal Blue
+                'Bishop': '#32CD32',    // Lime Green
+                'Knight': '#FF8C00',    // Dark Orange
+                'Pawn': '#9370DB'       // Medium Purple
+            };
+
             // Add X axis
-            svg.append('g')
+            const xAxis = svg.append('g')
                 .attr('class', 'axis')
                 .attr('transform', `translate(0,${height})`)
-                .call(d3.axisBottom(x))
-                .selectAll('text')
+                .call(d3.axisBottom(x));
+            
+            // Style the text labels with colors
+            xAxis.selectAll('text')
                 .attr('transform', 'rotate(-45)')
                 .style('text-anchor', 'end')
                 .attr('dx', '-.8em')
-                .attr('dy', '.15em');
+                .attr('dy', '.15em')
+                .each(function(d) {
+                    const text = d3.select(this);
+                    const pieces = d.split('-');
+                    
+                    // Clear the text
+                    text.text('');
+                    
+                    // Add each piece as a tspan with its color
+                    pieces.forEach((piece, i) => {
+                        text.append('tspan')
+                            .style('fill', pieceColors[piece] || '#333')
+                            .style('font-weight', '600')
+                            .text(piece + (i < pieces.length - 1 ? '-' : ''));
+                    });
+                });
 
             // Add Y axis
             svg.append('g')
