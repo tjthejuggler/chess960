@@ -1,6 +1,6 @@
-# Chess960 First Move Analysis - Interactive Visualization
+# Chess960 First Move Analysis - Interactive Visualizations
 
-**Last Updated:** 2025-11-28 20:55:00 UTC
+**Last Updated:** 2025-12-01 13:33:00 UTC
 
 ## Overview
 
@@ -242,10 +242,75 @@ Potential additions to this visualization:
 - Integration with chess engines for live analysis
 - Heatmap view showing file+distance frequency
 
+## Piece Combinations Analysis (NEW!)
+
+### Overview
+The new [`chess960_piece_combinations.html`](chess960_piece_combinations.html) visualization allows you to analyze piece combinations around any starting move. This provides deep insights into which piece configurations are most common for specific opening moves.
+
+### Features
+
+#### 🎯 Move Selection
+- **Dropdown selector**: Choose any starting move from all 960 positions
+- **Automatic filtering**: Instantly see all positions that use the selected move
+- **Combination size toggle**: Switch between 2-piece and 3-piece combinations
+
+#### 📊 Piece Combination Analysis
+
+**For Pawn Moves:**
+- Analyzes the 3 pieces behind the pawn:
+  - Diagonal left piece
+  - Directly behind piece
+  - Diagonal right piece
+- Shows all possible 2-piece or 3-piece combinations from these positions
+
+**For Piece Moves:**
+- Analyzes pieces on the back rank:
+  - Piece to the left
+  - The piece itself
+  - Piece to the right
+- Shows combinations of neighboring pieces
+
+#### 📈 Interactive Bar Chart
+- **X-axis**: Different piece combinations (e.g., "Bishop-Queen-King")
+- **Y-axis**: Number of instances (frequency)
+- **Color-coded bars**: Gradient coloring for visual appeal
+- **Hover tooltips**: Shows combination name, count, and percentage
+- **Sorted by frequency**: Most common combinations appear first
+
+#### 📊 Statistics Dashboard
+- **Total Positions**: Number of positions using the selected move
+- **Unique Combinations**: How many different piece combinations exist
+- **Most Common**: The most frequently occurring combination
+
+### How to Use
+
+1. **Start the server**: Run `./start_server.sh`
+2. **Open in browser**: Navigate to `http://localhost:8000/chess960_piece_combinations.html`
+3. **Select a move**: Choose any move from the dropdown (e.g., "e4", "Nf3", "d4")
+4. **Choose combination size**: Select 2 or 3 pieces
+5. **Analyze the chart**: See which piece combinations are most common for that move
+6. **Hover over bars**: Get detailed information about each combination
+
+### Example Insights
+
+- **For e4**: See which pieces are most commonly behind the e-pawn when it advances
+- **For Nf3**: See which pieces typically surround the knight on the back rank
+- **For d4**: Compare piece combinations with e4 to understand strategic differences
+
+### Use Cases
+
+1. **Opening Preparation**: Understand which piece setups favor certain pawn advances
+2. **Pattern Recognition**: Identify common piece configurations in Chess960
+3. **Strategic Analysis**: See correlations between piece placement and optimal moves
+4. **Position Comparison**: Compare different moves to see how piece arrangements differ
+
 ## Files
 
-- [`chess960_visualization.html`](chess960_visualization.html) - Main visualization file (self-contained)
-- [`chess960_best_moves_enhanced.json`](chess960_best_moves_enhanced.json) - Data source (960 positions)
+- [`chess960_visualization.html`](chess960_visualization.html) - Main scatter plot visualization (self-contained)
+- [`chess960_piece_combinations.html`](chess960_piece_combinations.html) - NEW: Piece combinations analysis (self-contained)
+- [`chess960_best_moves_enhanced.json`](chess960_best_moves_enhanced.json) - Enhanced data source (960 positions with piece combinations)
+- [`chess960_best_moves.json`](chess960_best_moves.json) - Original data source (960 positions)
+- [`enhance_analysis.py`](enhance_analysis.py) - Script to generate enhanced data with piece combinations
 - [`VISUALIZATION_README.md`](VISUALIZATION_README.md) - This documentation
 
 ## Credits

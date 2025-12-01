@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess960 Piece Combinations Analysis</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .controls {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #495057;
+            font-size: 0.95em;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        #chart {
+            padding: 30px;
+            min-height: 500px;
+        }
+
+        .bar {
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .bar:hover {
+            opacity: 0.8;
+        }
+
+        .axis text {
+            font-size: 12px;
+        }
+
+        .axis-label {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 14px;
+            max-width: 300px;
+            z-index: 1000;
+        }
+
+        .tooltip.show {
+            opacity: 1;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2em;
+            color: #6c757d;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            margin: 20px;
+            border-radius: 8px;
+            border: 1px solid #f5c6cb;
+        }
+
+        .combination-label {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 50px;
+            color: #6c757d;
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>♟️ Chess960 Piece Combinations Analysis</h1>
+            <p class="subtitle">Analyze piece combinations around starting moves</p>
+        </header>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="moveSelect">Select Starting Move:</label>
+                <select id="moveSelect">
+                    <option value="">Loading moves...</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="combinationSize">Combination Size:</label>
+                <select id="combinationSize">
+                    <option value="2">2 pieces</option>
+                    <option value="3" selected>3 pieces</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="stats-container" id="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalPositions">-</div>
+                <div class="stat-label">Total Positions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="uniqueCombinations">-</div>
+                <div class="stat-label">Unique Combinations</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="mostCommon">-</div>
+                <div class="stat-label">Most Common</div>
+            </div>
+        </div>
+
+        <div id="chart"></div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        let data = [];
+        let currentMove = '';
+        let combinationSize = 3;
+
+        // Load the enhanced data
+        d3.json('chess960_best_moves_enhanced.json').then(loadedData => {
+            data = Object.values(loadedData);
+            console.log(`Loaded ${data.length} positions`);
+            populateMoveSelector();
+        }).catch(error => {
+            console.error('Error loading data:', error);
+            document.getElementById('chart').innerHTML = 
+                '<div class="error">Error loading data. Please ensure chess960_best_moves_enhanced.json exists.</div>';
+        });
+
+        function populateMoveSelector() {
+            const moveSelect = document.getElementById('moveSelect');
+            
+            // Get all unique moves
+            const moves = new Set();
+            data.forEach(d => {
+                if (d.best_move_san) {
+                    moves.add(d.best_move_san);
+                }
+            });
+
+            // Sort moves
+            const sortedMoves = Array.from(moves).sort();
+            
+            moveSelect.innerHTML = '<option value="">-- Select a move --</option>';
+            
+            // Add special aggregate options
+            const aggregateGroup = document.createElement('optgroup');
+            aggregateGroup.label = 'Aggregate Pawn Moves';
+            
+            const pawn4thOption = document.createElement('option');
+            pawn4thOption.value = 'PAWN_4TH_RANK';
+            pawn4thOption.textContent = '🔹 All Pawns to 4th Rank';
+            aggregateGroup.appendChild(pawn4thOption);
+            
+            const pawn3rdOption = document.createElement('option');
+            pawn3rdOption.value = 'PAWN_3RD_RANK';
+            pawn3rdOption.textContent = '🔸 All Pawns to 3rd Rank';
+            aggregateGroup.appendChild(pawn3rdOption);
+            
+            moveSelect.appendChild(aggregateGroup);
+            
+            // Add individual moves
+            const individualGroup = document.createElement('optgroup');
+            individualGroup.label = 'Individual Moves';
+            
+            sortedMoves.forEach(move => {
+                const option = document.createElement('option');
+                option.value = move;
+                option.textContent = move;
+                individualGroup.appendChild(option);
+            });
+            
+            moveSelect.appendChild(individualGroup);
+
+            // Set up event listeners
+            moveSelect.addEventListener('change', (e) => {
+                currentMove = e.target.value;
+                updateVisualization();
+            });
+
+            document.getElementById('combinationSize').addEventListener('change', (e) => {
+                combinationSize = parseInt(e.target.value);
+                updateVisualization();
+            });
+        }
+
+        function getPieceCombinations(position, size) {
+            const combinations = [];
+            
+            // Check if it's a pawn move
+            if (position.piece_moved === 'Pawn' && position.pieces_behind_pawn) {
+                const behind = position.pieces_behind_pawn;
+                const pieces = [];
+                
+                if (behind.diagonal_left) pieces.push(behind.diagonal_left.piece);
+                if (behind.directly_behind) pieces.push(behind.directly_behind.piece);
+                if (behind.diagonal_right) pieces.push(behind.diagonal_right.piece);
+                
+                // Generate combinations of the specified size
+                if (size === 2 && pieces.length >= 2) {
+                    for (let i = 0; i < pieces.length - 1; i++) {
+                        combinations.push([pieces[i], pieces[i + 1]].join('-'));
+                    }
+                } else if (size === 3 && pieces.length === 3) {
+                    combinations.push(pieces.join('-'));
+                }
+            } else if (position.piece_moved !== 'Pawn' && position.piece_order) {
+                // For piece moves, find the piece in the back rank and get neighbors
+                const pieceOrder = position.piece_order;
+                const fromSquare = position.from_square;
+                const file = fromSquare.charCodeAt(0) - 'a'.charCodeAt(0); // 0-7
+                
+                if (file >= 0 && file < pieceOrder.length) {
+                    const pieces = [];
+                    
+                    // Get pieces to the left and right
+                    if (size === 2) {
+                        if (file > 0) {
+                            pieces.push([pieceOrder[file - 1], pieceOrder[file]].join('-'));
+                        }
+                        if (file < pieceOrder.length - 1) {
+                            pieces.push([pieceOrder[file], pieceOrder[file + 1]].join('-'));
+                        }
+                    } else if (size === 3) {
+                        if (file > 0 && file < pieceOrder.length - 1) {
+                            pieces.push([pieceOrder[file - 1], pieceOrder[file], pieceOrder[file + 1]].join('-'));
+                        }
+                    }
+                    
+                    combinations.push(...pieces);
+                }
+            }
+            
+            return combinations;
+        }
+
+        function updateVisualization() {
+            if (!currentMove) {
+                document.getElementById('chart').innerHTML =
+                    '<div class="no-data">Please select a move to see piece combinations</div>';
+                return;
+            }
+
+            // Filter data for the selected move
+            let filteredData;
+            
+            if (currentMove === 'PAWN_4TH_RANK') {
+                // Filter for all pawn moves to 4th rank (a4, b4, c4, d4, e4, f4, g4, h4)
+                filteredData = data.filter(d => {
+                    return d.piece_moved === 'Pawn' &&
+                           d.best_move_san &&
+                           d.best_move_san.match(/^[a-h]4$/);
+                });
+            } else if (currentMove === 'PAWN_3RD_RANK') {
+                // Filter for all pawn moves to 3rd rank (a3, b3, c3, d3, e3, f3, g3, h3)
+                filteredData = data.filter(d => {
+                    return d.piece_moved === 'Pawn' &&
+                           d.best_move_san &&
+                           d.best_move_san.match(/^[a-h]3$/);
+                });
+            } else {
+                // Filter for specific move
+                filteredData = data.filter(d => d.best_move_san === currentMove);
+            }
+            
+            if (filteredData.length === 0) {
+                document.getElementById('chart').innerHTML =
+                    '<div class="no-data">No data found for this move</div>';
+                return;
+            }
+
+            // Count combinations
+            const combinationCounts = {};
+            filteredData.forEach(position => {
+                const combinations = getPieceCombinations(position, combinationSize);
+                combinations.forEach(combo => {
+                    combinationCounts[combo] = (combinationCounts[combo] || 0) + 1;
+                });
+            });
+
+            // Convert to array and sort by count
+            const combinationArray = Object.entries(combinationCounts)
+                .map(([combo, count]) => ({ combination: combo, count }))
+                .sort((a, b) => b.count - a.count);
+
+            // Update stats
+            document.getElementById('totalPositions').textContent = filteredData.length;
+            document.getElementById('uniqueCombinations').textContent = combinationArray.length;
+            document.getElementById('mostCommon').textContent = 
+                combinationArray.length > 0 ? combinationArray[0].combination : 'N/A';
+
+            // Create the bar chart
+            createBarChart(combinationArray);
+        }
+
+        function createBarChart(combinationData) {
+            // Clear previous chart
+            d3.select('#chart').html('');
+
+            if (combinationData.length === 0) {
+                document.getElementById('chart').innerHTML = 
+                    '<div class="no-data">No combinations found for this move and size</div>';
+                return;
+            }
+
+            const margin = { top: 20, right: 30, bottom: 100, left: 60 };
+            const width = document.getElementById('chart').clientWidth - margin.left - margin.right;
+            const height = 500 - margin.top - margin.bottom;
+
+            const svg = d3.select('#chart')
+                .append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+
+            // Create scales
+            const x = d3.scaleBand()
+                .domain(combinationData.map(d => d.combination))
+                .range([0, width])
+                .padding(0.2);
+
+            const y = d3.scaleLinear()
+                .domain([0, d3.max(combinationData, d => d.count)])
+                .nice()
+                .range([height, 0]);
+
+            // Create color scale
+            const color = d3.scaleSequential()
+                .domain([0, combinationData.length - 1])
+                .interpolator(d3.interpolateViridis);
+
+            // Add bars
+            svg.selectAll('.bar')
+                .data(combinationData)
+                .enter()
+                .append('rect')
+                .attr('class', 'bar')
+                .attr('x', d => x(d.combination))
+                .attr('y', d => y(d.count))
+                .attr('width', x.bandwidth())
+                .attr('height', d => height - y(d.count))
+                .attr('fill', (d, i) => color(i))
+                .on('mouseover', function(event, d) {
+                    const tooltip = document.getElementById('tooltip');
+                    tooltip.innerHTML = `
+                        <div class="combination-label">${d.combination}</div>
+                        <div>Count: ${d.count}</div>
+                        <div>Percentage: ${((d.count / combinationData.reduce((sum, item) => sum + item.count, 0)) * 100).toFixed(1)}%</div>
+                    `;
+                    tooltip.classList.add('show');
+                    tooltip.style.left = event.pageX + 10 + 'px';
+                    tooltip.style.top = event.pageY - 10 + 'px';
+                })
+                .on('mouseout', function() {
+                    document.getElementById('tooltip').classList.remove('show');
+                });
+
+            // Add X axis
+            svg.append('g')
+                .attr('class', 'axis')
+                .attr('transform', `translate(0,${height})`)
+                .call(d3.axisBottom(x))
+                .selectAll('text')
+                .attr('transform', 'rotate(-45)')
+                .style('text-anchor', 'end')
+                .attr('dx', '-.8em')
+                .attr('dy', '.15em');
+
+            // Add Y axis
+            svg.append('g')
+                .attr('class', 'axis')
+                .call(d3.axisLeft(y));
+
+            // Add Y axis label
+            svg.append('text')
+                .attr('class', 'axis-label')
+                .attr('transform', 'rotate(-90)')
+                .attr('y', 0 - margin.left)
+                .attr('x', 0 - (height / 2))
+                .attr('dy', '1em')
+                .style('text-anchor', 'middle')
+                .text('Number of Instances');
+
+            // Add X axis label
+            svg.append('text')
+                .attr('class', 'axis-label')
+                .attr('x', width / 2)
+                .attr('y', height + margin.bottom - 10)
+                .style('text-anchor', 'middle')
+                .text('Piece Combinations');
+        }
+    </script>
+</body>
+</html>
