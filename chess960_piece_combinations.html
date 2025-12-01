@@ -46,6 +46,41 @@
             opacity: 0.9;
         }
 
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 600;
+            color: #6c757d;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab:hover {
+            background: #e9ecef;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            background: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         .controls {
             padding: 30px;
             background: #f8f9fa;
@@ -108,7 +143,7 @@
             font-size: 0.9em;
         }
 
-        #chart {
+        #chart, #comboChart {
             padding: 30px;
             min-height: 500px;
         }
@@ -176,6 +211,55 @@
             color: #6c757d;
             font-size: 1.1em;
         }
+
+        .position-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+
+        .position-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .position-card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .position-card .board {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            background: #333;
+        }
+
+        .position-card .info {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 10px;
+        }
+
+        .position-card .move {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 1.1em;
+            margin: 5px 0;
+        }
+
+        .stat-card.clickable {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .stat-card.clickable:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
     </style>
 </head>
 <body>
@@ -185,7 +269,14 @@
             <p class="subtitle">Analyze piece combinations around starting moves</p>
         </header>
 
-        <div class="controls">
+        <div class="tabs">
+            <div class="tab active" data-tab="moves">Moves by Combination</div>
+            <div class="tab" data-tab="combinations">Combination Involvement</div>
+            <div class="tab" data-tab="examples">Position Examples</div>
+        </div>
+
+        <div id="movesTab" class="tab-content active">
+            <div class="controls">
             <div class="control-group">
                 <label for="moveSelect">Select Starting Move:</label>
                 <select id="moveSelect">
@@ -199,9 +290,9 @@
                     <option value="3" selected>3 pieces</option>
                 </select>
             </div>
-        </div>
+            </div>
 
-        <div class="stats-container" id="stats">
+            <div class="stats-container" id="stats">
             <div class="stat-card">
                 <div class="stat-value" id="totalPositions">-</div>
                 <div class="stat-label">Total Positions</div>
@@ -214,9 +305,54 @@
                 <div class="stat-value" id="mostCommon">-</div>
                 <div class="stat-label">Most Common</div>
             </div>
+            </div>
+
+            <div id="chart"></div>
         </div>
 
-        <div id="chart"></div>
+        <div id="combinationsTab" class="tab-content">
+            <div class="controls">
+                <div class="control-group">
+                    <label for="combinationSelect">Select Piece Combination:</label>
+                    <select id="combinationSelect">
+                        <option value="">Loading combinations...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="stats-container" id="comboStats">
+                <div class="stat-card">
+                    <div class="stat-value" id="comboTotalPositions">-</div>
+                    <div class="stat-label">Total Positions</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="comboInvolved">-</div>
+                    <div class="stat-label">Involved in Move</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="comboNotInvolved">-</div>
+                    <div class="stat-label">Not Involved</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="comboInvolvementRate">-</div>
+                    <div class="stat-label">Involvement Rate</div>
+                </div>
+            </div>
+
+            <div id="comboChart"></div>
+        </div>
+
+        <div id="examplesTab" class="tab-content">
+            <div class="controls">
+                <div style="text-align: center; padding: 20px;">
+                    <h2 id="examplesTitle" style="color: #667eea; margin-bottom: 10px;">Position Examples</h2>
+                    <p id="examplesSubtitle" style="color: #6c757d;"></p>
+                </div>
+            </div>
+
+            <div id="examplesContainer" style="padding: 30px; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+            </div>
+        </div>
     </div>
 
     <div class="tooltip" id="tooltip"></div>
@@ -225,6 +361,216 @@
         let data = [];
         let currentMove = '';
         let combinationSize = 3;
+        let currentCombination = '';
+        let allCombinations = new Set();
+        let examplePositions = [];
+
+        // Tab switching
+        document.addEventListener('DOMContentLoaded', () => {
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabName = tab.dataset.tab;
+                    switchTab(tabName);
+                });
+            });
+        });
+
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(`${tabName}Tab`).classList.add('active');
+            
+            // Load appropriate data
+            if (tabName === 'combinations' && allCombinations.size === 0) {
+                populateCombinationSelector();
+            }
+        }
+
+        function switchToCombinationTab(combination) {
+            switchTab('combinations');
+            document.getElementById('combinationSelect').value = combination;
+            currentCombination = combination;
+            updateCombinationVisualization();
+        }
+
+        function showExamples(positions, title, subtitle) {
+            examplePositions = positions;
+            switchTab('examples');
+            document.getElementById('examplesTitle').textContent = title;
+            document.getElementById('examplesSubtitle').textContent = subtitle;
+            displayExamples();
+        }
+
+        function displayExamples() {
+            const container = document.getElementById('examplesContainer');
+            
+            if (examplePositions.length === 0) {
+                container.innerHTML = '<div class="no-data">No positions found</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            
+            examplePositions.forEach((position, index) => {
+                const card = document.createElement('div');
+                card.className = 'position-card';
+                
+                const board = renderBoard(position.piece_order, position, currentCombination);
+                
+                card.innerHTML = `
+                    <h3>Position ${position.position_id || index + 1}</h3>
+                    <div class="board">${board}</div>
+                    <div class="move">Best Move: ${position.best_move_san || 'N/A'}</div>
+                    <div class="info">
+                        <div>Piece Order: ${position.piece_order ? position.piece_order.join('-') : 'N/A'}</div>
+                        <div>Evaluation: ${position.evaluation !== undefined ? position.evaluation.toFixed(2) : 'N/A'}</div>
+                    </div>
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+
+        function renderBoard(pieceOrder, position, combination) {
+            if (!pieceOrder) return 'No board data';
+            
+            const whitePieceSymbols = {
+                'King': '♔',
+                'Queen': '♕',
+                'Rook': '♖',
+                'Bishop': '♗',
+                'Knight': '♘',
+                'Pawn': '♙'
+            };
+            
+            const blackPieceSymbols = {
+                'King': '♚',
+                'Queen': '♛',
+                'Rook': '♜',
+                'Bishop': '♝',
+                'Knight': '♞',
+                'Pawn': '♟'
+            };
+            
+            // Find combination pieces positions
+            const comboFiles = [];
+            if (combination) {
+                const comboPieces = combination.split('-');
+                const comboSize = comboPieces.length;
+                
+                // Find where this combination appears in the piece order
+                for (let i = 0; i <= pieceOrder.length - comboSize; i++) {
+                    let match = true;
+                    for (let j = 0; j < comboSize; j++) {
+                        if (pieceOrder[i + j] !== comboPieces[j]) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if (match) {
+                        for (let j = 0; j < comboSize; j++) {
+                            comboFiles.push(i + j);
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            // Parse move to get from/to squares
+            let fromFile = -1, fromRank = -1, toFile = -1, toRank = -1;
+            if (position && position.from_square && position.to_square) {
+                fromFile = position.from_square.charCodeAt(0) - 'a'.charCodeAt(0);
+                fromRank = parseInt(position.from_square[1]) - 1;
+                toFile = position.to_square.charCodeAt(0) - 'a'.charCodeAt(0);
+                toRank = parseInt(position.to_square[1]) - 1;
+            }
+            
+            // Create 8x8 board with perfect squares
+            let board = '<div style="display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); gap: 0; width: 100%; max-width: 280px; aspect-ratio: 1/1; margin: 0 auto; border: 3px solid #333; box-sizing: border-box;">';
+            
+            // Rank 8 (black pieces - mirror of white pieces from piece_order)
+            pieceOrder.forEach((piece, file) => {
+                const rank = 7; // Rank 8 (0-indexed as 7)
+                const isLight = (rank + file) % 2 === 0;
+                let bgColor = isLight ? '#f0d9b5' : '#b58863';
+                
+                // Highlight combination pieces
+                if (comboFiles.includes(file)) {
+                    bgColor = '#90EE90'; // Light green for combination
+                }
+                
+                const symbol = blackPieceSymbols[piece] || '?';
+                board += `<div style="font-size: 28px; display: flex; align-items: center; justify-content: center; background: ${bgColor}; border: 0.5px solid #333; aspect-ratio: 1/1;">${symbol}</div>`;
+            });
+            
+            // Rank 7 (black pawns)
+            for (let file = 0; file < 8; file++) {
+                const rank = 6; // Rank 7 (0-indexed as 6)
+                const isLight = (rank + file) % 2 === 0;
+                const bgColor = isLight ? '#f0d9b5' : '#b58863';
+                board += `<div style="font-size: 28px; display: flex; align-items: center; justify-content: center; background: ${bgColor}; border: 0.5px solid #333; aspect-ratio: 1/1;">♟</div>`;
+            }
+            
+            // Ranks 6-3 (empty squares with alternating colors)
+            for (let rank = 5; rank >= 2; rank--) {
+                for (let file = 0; file < 8; file++) {
+                    const isLight = (rank + file) % 2 === 0;
+                    let bgColor = isLight ? '#f0d9b5' : '#b58863';
+                    
+                    // Highlight move destination
+                    if (file === toFile && rank === toRank) {
+                        bgColor = '#FFD700'; // Gold for move destination
+                    }
+                    
+                    board += `<div style="font-size: 28px; display: flex; align-items: center; justify-content: center; background: ${bgColor}; border: 0.5px solid #333; aspect-ratio: 1/1;">·</div>`;
+                }
+            }
+            
+            // Rank 2 (white pawns)
+            for (let file = 0; file < 8; file++) {
+                const rank = 1; // Rank 2 (0-indexed as 1)
+                const isLight = (rank + file) % 2 === 0;
+                let bgColor = isLight ? '#f0d9b5' : '#b58863';
+                
+                // Highlight move source or destination
+                if (file === fromFile && rank === fromRank) {
+                    bgColor = '#87CEEB'; // Sky blue for move source
+                } else if (file === toFile && rank === toRank) {
+                    bgColor = '#FFD700'; // Gold for move destination
+                }
+                
+                board += `<div style="font-size: 28px; display: flex; align-items: center; justify-content: center; background: ${bgColor}; border: 0.5px solid #333; aspect-ratio: 1/1;">♙</div>`;
+            }
+            
+            // Rank 1 (white pieces from piece_order)
+            pieceOrder.forEach((piece, file) => {
+                const rank = 0; // Rank 1 (0-indexed as 0)
+                const isLight = (rank + file) % 2 === 0;
+                let bgColor = isLight ? '#f0d9b5' : '#b58863';
+                
+                // Highlight combination pieces
+                if (comboFiles.includes(file)) {
+                    bgColor = '#90EE90'; // Light green for combination
+                }
+                
+                // Highlight move source (overrides combination highlight)
+                if (file === fromFile && rank === fromRank) {
+                    bgColor = '#87CEEB'; // Sky blue for move source
+                }
+                
+                const symbol = whitePieceSymbols[piece] || '?';
+                board += `<div style="font-size: 28px; display: flex; align-items: center; justify-content: center; background: ${bgColor}; border: 0.5px solid #333; aspect-ratio: 1/1;">${symbol}</div>`;
+            });
+            
+            board += '</div>';
+            
+            return board;
+        }
 
         // Load the enhanced data
         d3.json('chess960_best_moves_enhanced.json').then(loadedData => {
@@ -292,6 +638,55 @@
                 combinationSize = parseInt(e.target.value);
                 updateVisualization();
             });
+
+            document.getElementById('combinationSelect').addEventListener('change', (e) => {
+                currentCombination = e.target.value;
+                updateCombinationVisualization();
+            });
+        }
+
+        function populateCombinationSelector() {
+            const combinationSelect = document.getElementById('combinationSelect');
+            
+            // Collect all unique combinations and count their involvement
+            const combinationCounts = {};
+            
+            data.forEach(position => {
+                // Get 2-piece combinations
+                const combos2 = getPieceCombinations(position, 2);
+                combos2.forEach(c => {
+                    if (!combinationCounts[c]) {
+                        combinationCounts[c] = 0;
+                    }
+                    combinationCounts[c]++;
+                });
+                
+                // Get 3-piece combinations
+                const combos3 = getPieceCombinations(position, 3);
+                combos3.forEach(c => {
+                    if (!combinationCounts[c]) {
+                        combinationCounts[c] = 0;
+                    }
+                    combinationCounts[c]++;
+                });
+            });
+
+            // Convert to array and sort by count (descending)
+            const sortedCombinations = Object.entries(combinationCounts)
+                .map(([combo, count]) => ({ combo, count }))
+                .sort((a, b) => b.count - a.count);
+            
+            combinationSelect.innerHTML = '<option value="">-- Select a combination --</option>';
+            
+            sortedCombinations.forEach(({ combo, count }) => {
+                const option = document.createElement('option');
+                option.value = combo;
+                option.textContent = `${combo} (${count})`;
+                combinationSelect.appendChild(option);
+            });
+            
+            // Store for later use
+            allCombinations = new Set(sortedCombinations.map(c => c.combo));
         }
 
         function getPieceCombinations(position, size) {
@@ -308,8 +703,16 @@
                 
                 // Generate combinations of the specified size
                 if (size === 2 && pieces.length >= 2) {
-                    for (let i = 0; i < pieces.length - 1; i++) {
-                        combinations.push([pieces[i], pieces[i + 1]].join('-'));
+                    // For 2-piece combinations with pawn moves, only include edge combinations
+                    // (when the pawn is on a-file or h-file)
+                    const fromSquare = position.from_square;
+                    const file = fromSquare.charCodeAt(0) - 'a'.charCodeAt(0); // 0-7
+                    
+                    if (file === 0 || file === 7) {
+                        // Edge pawn - include the 2-piece combination
+                        for (let i = 0; i < pieces.length - 1; i++) {
+                            combinations.push([pieces[i], pieces[i + 1]].join('-'));
+                        }
                     }
                 } else if (size === 3 && pieces.length === 3) {
                     combinations.push(pieces.join('-'));
@@ -325,11 +728,13 @@
                     
                     // Get pieces to the left and right
                     if (size === 2) {
-                        if (file > 0) {
-                            pieces.push([pieceOrder[file - 1], pieceOrder[file]].join('-'));
-                        }
-                        if (file < pieceOrder.length - 1) {
+                        // For 2-piece combinations, only include if on the edge
+                        if (file === 0 && file < pieceOrder.length - 1) {
+                            // Left edge - piece and its right neighbor
                             pieces.push([pieceOrder[file], pieceOrder[file + 1]].join('-'));
+                        } else if (file === 7 && file > 0) {
+                            // Right edge - piece and its left neighbor
+                            pieces.push([pieceOrder[file - 1], pieceOrder[file]].join('-'));
                         }
                     } else if (size === 3) {
                         if (file > 0 && file < pieceOrder.length - 1) {
@@ -457,6 +862,7 @@
                         <div class="combination-label">${d.combination}</div>
                         <div>Count: ${d.count}</div>
                         <div>Percentage: ${((d.count / combinationData.reduce((sum, item) => sum + item.count, 0)) * 100).toFixed(1)}%</div>
+                        <div style="margin-top: 8px; font-size: 11px; opacity: 0.8;">Click to see involvement details</div>
                     `;
                     tooltip.classList.add('show');
                     tooltip.style.left = event.pageX + 10 + 'px';
@@ -464,6 +870,9 @@
                 })
                 .on('mouseout', function() {
                     document.getElementById('tooltip').classList.remove('show');
+                })
+                .on('click', function(event, d) {
+                    switchToCombinationTab(d.combination);
                 });
 
             // Define piece colors
@@ -526,6 +935,246 @@
                 .attr('y', height + margin.bottom - 10)
                 .style('text-anchor', 'middle')
                 .text('Piece Combinations');
+        }
+
+        function updateCombinationVisualization() {
+            if (!currentCombination) {
+                document.getElementById('comboChart').innerHTML =
+                    '<div class="no-data">Please select a combination to see involvement analysis</div>';
+                return;
+            }
+
+            const pieces = currentCombination.split('-');
+            const comboSize = pieces.length;
+
+            // First, count how many times this combination appears across all positions
+            let totalOccurrences = 0;
+            const moveCounts = {};
+            let involvedCount = 0;
+
+            data.forEach(position => {
+                // Check if this combination exists in this position at all
+                const allCombosInPosition = getAllPieceCombinationsInPosition(position, comboSize);
+                const comboExistsInPosition = allCombosInPosition.includes(currentCombination);
+                
+                if (comboExistsInPosition) {
+                    totalOccurrences++;
+                    
+                    // Now check if it's involved in the move
+                    const involvedCombos = getPieceCombinations(position, comboSize);
+                    const isInvolved = involvedCombos.includes(currentCombination);
+                    
+                    if (isInvolved) {
+                        involvedCount++;
+                        const move = position.best_move_san || 'Unknown';
+                        moveCounts[move] = (moveCounts[move] || 0) + 1;
+                    }
+                }
+            });
+
+            const notInvolvedCount = totalOccurrences - involvedCount;
+
+            // Update stats and make them clickable
+            document.getElementById('comboTotalPositions').textContent = totalOccurrences;
+            document.getElementById('comboInvolved').textContent = involvedCount;
+            document.getElementById('comboNotInvolved').textContent = notInvolvedCount;
+            document.getElementById('comboInvolvementRate').textContent =
+                totalOccurrences > 0 ? ((involvedCount / totalOccurrences) * 100).toFixed(1) + '%' : '0%';
+
+            // Make stat cards clickable
+            const involvedCard = document.getElementById('comboInvolved').parentElement;
+            const notInvolvedCard = document.getElementById('comboNotInvolved').parentElement;
+            
+            involvedCard.classList.add('clickable');
+            notInvolvedCard.classList.add('clickable');
+            
+            involvedCard.onclick = () => {
+                const filteredPositions = data.filter(position => {
+                    const allCombosInPosition = getAllPieceCombinationsInPosition(position, comboSize);
+                    const comboExists = allCombosInPosition.includes(currentCombination);
+                    
+                    if (!comboExists) return false;
+                    
+                    const involvedCombos = getPieceCombinations(position, comboSize);
+                    return involvedCombos.includes(currentCombination);
+                });
+                
+                showExamples(
+                    filteredPositions,
+                    `${currentCombination} - Involved in Move`,
+                    `${filteredPositions.length} positions where this combination is involved in the best move`
+                );
+            };
+            
+            notInvolvedCard.onclick = () => {
+                const filteredPositions = data.filter(position => {
+                    const allCombosInPosition = getAllPieceCombinationsInPosition(position, comboSize);
+                    const comboExists = allCombosInPosition.includes(currentCombination);
+                    
+                    if (!comboExists) return false;
+                    
+                    const involvedCombos = getPieceCombinations(position, comboSize);
+                    return !involvedCombos.includes(currentCombination);
+                });
+                
+                showExamples(
+                    filteredPositions,
+                    `${currentCombination} - Not Involved`,
+                    `${filteredPositions.length} positions where this combination exists but is not involved in the best move`
+                );
+            };
+
+            // Convert to array and sort
+            const moveArray = Object.entries(moveCounts)
+                .map(([move, count]) => ({ move, count }))
+                .sort((a, b) => b.count - a.count);
+
+            // Create the bar chart
+            createCombinationChart(moveArray);
+        }
+
+        function getAllPieceCombinationsInPosition(position, size) {
+            const combinations = [];
+            
+            // Check piece order for all possible combinations
+            if (position.piece_order) {
+                const pieceOrder = position.piece_order;
+                
+                if (size === 2) {
+                    // Get all adjacent 2-piece combinations
+                    for (let i = 0; i < pieceOrder.length - 1; i++) {
+                        combinations.push([pieceOrder[i], pieceOrder[i + 1]].join('-'));
+                    }
+                } else if (size === 3) {
+                    // Get all adjacent 3-piece combinations
+                    for (let i = 0; i < pieceOrder.length - 2; i++) {
+                        combinations.push([pieceOrder[i], pieceOrder[i + 1], pieceOrder[i + 2]].join('-'));
+                    }
+                }
+            }
+            
+            return combinations;
+        }
+
+        function createCombinationChart(moveData) {
+            // Clear previous chart
+            d3.select('#comboChart').html('');
+
+            if (moveData.length === 0) {
+                document.getElementById('comboChart').innerHTML =
+                    '<div class="no-data">No data found for this combination</div>';
+                return;
+            }
+
+            const margin = { top: 20, right: 30, bottom: 100, left: 60 };
+            const width = document.getElementById('comboChart').clientWidth - margin.left - margin.right;
+            const height = 500 - margin.top - margin.bottom;
+
+            const svg = d3.select('#comboChart')
+                .append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+
+            // Create scales
+            const x = d3.scaleBand()
+                .domain(moveData.map(d => d.move))
+                .range([0, width])
+                .padding(0.2);
+
+            const y = d3.scaleLinear()
+                .domain([0, d3.max(moveData, d => d.count)])
+                .nice()
+                .range([height, 0]);
+
+            // Create color scale
+            const color = d3.scaleSequential()
+                .domain([0, moveData.length - 1])
+                .interpolator(d3.interpolateViridis);
+
+            // Add bars
+            svg.selectAll('.bar')
+                .data(moveData)
+                .enter()
+                .append('rect')
+                .attr('class', 'bar')
+                .attr('x', d => x(d.move))
+                .attr('y', d => y(d.count))
+                .attr('width', x.bandwidth())
+                .attr('height', d => height - y(d.count))
+                .attr('fill', (d, i) => color(i))
+                .on('mouseover', function(event, d) {
+                    const tooltip = document.getElementById('tooltip');
+                    tooltip.innerHTML = `
+                        <div class="combination-label">${d.move}</div>
+                        <div>Count: ${d.count}</div>
+                        <div>Percentage: ${((d.count / moveData.reduce((sum, item) => sum + item.count, 0)) * 100).toFixed(1)}%</div>
+                    `;
+                    tooltip.classList.add('show');
+                    tooltip.style.left = event.pageX + 10 + 'px';
+                    tooltip.style.top = event.pageY - 10 + 'px';
+                })
+                .on('mouseout', function() {
+                    document.getElementById('tooltip').classList.remove('show');
+                })
+                .on('click', function(event, d) {
+                    // Filter positions for this specific move
+                    const pieces = currentCombination.split('-');
+                    const comboSize = pieces.length;
+                    
+                    const filteredPositions = data.filter(position => {
+                        const allCombosInPosition = getAllPieceCombinationsInPosition(position, comboSize);
+                        const comboExists = allCombosInPosition.includes(currentCombination);
+                        
+                        if (!comboExists) return false;
+                        
+                        const involvedCombos = getPieceCombinations(position, comboSize);
+                        const isInvolved = involvedCombos.includes(currentCombination);
+                        
+                        return isInvolved && position.best_move_san === d.move;
+                    });
+                    
+                    showExamples(
+                        filteredPositions,
+                        `${currentCombination} - Move: ${d.move}`,
+                        `${filteredPositions.length} positions where this combination is involved in ${d.move}`
+                    );
+                });
+
+            // Add X axis
+            svg.append('g')
+                .attr('class', 'axis')
+                .attr('transform', `translate(0,${height})`)
+                .call(d3.axisBottom(x))
+                .selectAll('text')
+                .attr('transform', 'rotate(-45)')
+                .style('text-anchor', 'end')
+                .attr('dx', '-.8em')
+                .attr('dy', '.15em');
+
+            // Add Y axis
+            svg.append('g')
+                .attr('class', 'axis')
+                .call(d3.axisLeft(y));
+
+            // Add Y axis label
+            svg.append('text')
+                .attr('class', 'axis-label')
+                .attr('transform', 'rotate(-90)')
+                .attr('y', 0 - margin.left)
+                .attr('x', 0 - (height / 2))
+                .attr('dy', '1em')
+                .style('text-anchor', 'middle')
+                .text('Number of Positions');
+
+            // Add X axis label
+            svg.append('text')
+                .attr('class', 'axis-label')
+                .attr('x', width / 2)
+                .attr('y', height + margin.bottom - 10)
+                .style('text-anchor', 'middle')
+                .text('Moves');
         }
     </script>
 </body>
