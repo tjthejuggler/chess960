@@ -586,16 +586,31 @@
         function populateMoveSelector() {
             const moveSelect = document.getElementById('moveSelect');
             
-            // Get all unique moves
-            const moves = new Set();
+            // Count occurrences of each move
+            const moveCounts = {};
             data.forEach(d => {
                 if (d.best_move_san) {
-                    moves.add(d.best_move_san);
+                    moveCounts[d.best_move_san] = (moveCounts[d.best_move_san] || 0) + 1;
                 }
             });
 
-            // Sort moves
-            const sortedMoves = Array.from(moves).sort();
+            // Convert to array and sort by count (descending)
+            const sortedMoves = Object.entries(moveCounts)
+                .map(([move, count]) => ({ move, count }))
+                .sort((a, b) => b.count - a.count);
+            
+            // Count aggregate moves
+            const pawn4thCount = data.filter(d =>
+                d.piece_moved === 'Pawn' &&
+                d.best_move_san &&
+                d.best_move_san.match(/^[a-h]4$/)
+            ).length;
+            
+            const pawn3rdCount = data.filter(d =>
+                d.piece_moved === 'Pawn' &&
+                d.best_move_san &&
+                d.best_move_san.match(/^[a-h]3$/)
+            ).length;
             
             moveSelect.innerHTML = '<option value="">-- Select a move --</option>';
             
@@ -605,24 +620,24 @@
             
             const pawn4thOption = document.createElement('option');
             pawn4thOption.value = 'PAWN_4TH_RANK';
-            pawn4thOption.textContent = '🔹 All Pawns to 4th Rank';
+            pawn4thOption.textContent = `🔹 All Pawns to 4th Rank (${pawn4thCount})`;
             aggregateGroup.appendChild(pawn4thOption);
             
             const pawn3rdOption = document.createElement('option');
             pawn3rdOption.value = 'PAWN_3RD_RANK';
-            pawn3rdOption.textContent = '🔸 All Pawns to 3rd Rank';
+            pawn3rdOption.textContent = `🔸 All Pawns to 3rd Rank (${pawn3rdCount})`;
             aggregateGroup.appendChild(pawn3rdOption);
             
             moveSelect.appendChild(aggregateGroup);
             
-            // Add individual moves
+            // Add individual moves sorted by frequency
             const individualGroup = document.createElement('optgroup');
             individualGroup.label = 'Individual Moves';
             
-            sortedMoves.forEach(move => {
+            sortedMoves.forEach(({ move, count }) => {
                 const option = document.createElement('option');
                 option.value = move;
-                option.textContent = move;
+                option.textContent = `${move} (${count})`;
                 individualGroup.appendChild(option);
             });
             
